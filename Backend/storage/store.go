@@ -43,7 +43,7 @@ func (s *Store) CreateUser(ctx context.Context, username, password, bio string) 
 
 func (s *Store) Login(ctx context.Context, username, password, bio string) (*User, error) {
 	u, uerr := s.GetUserByUsername(ctx, username)
-	if uerr == nil {
+	if uerr != nil {
 		return nil, fmt.Errorf("用户不存在：%w", uerr)
 	}
 
