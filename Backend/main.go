@@ -1,6 +1,7 @@
 package main
 
 import (
+	"Backend/auth"
 	"Backend/handle"
 	"Backend/storage"
 	"log"
@@ -16,15 +17,26 @@ func main() {
 	if dberr != nil {
 		panic("链接数据库失败")
 	}
-	s := storage.NewStore(db)
 
+	sqldb, err := db.DB()
+	if err != nil {
+		panic("数据库处理错误")
+	}
+
+	s := storage.NewStore(db)
 	r := gin.Default()
 
 	api := r.Group("/api")
 	{
-		api.POST("/users/register", func(c *gin.Context) { handle.UsersRegister(c, s) })
+		api.POST("/users/register", func(c *gin.Context) { handle.ApiUsersRegister(c, s, sqldb) })
 
-		api.POST("/users/login", func(c *gin.Context) { handle.UserLogin(c, s) })
+		api.POST("/users/login", func(c *gin.Context) { handle.ApiUserLogin(c, s, sqldb) })
+
+		protected := api.Group("/update")
+		protected.Use(auth.Auth(sqldb))
+		{
+			protected.POST("/bio", func(c *gin.Context) { handle.ApiUserUpdateBio(c, sqldb) })
+		}
 	}
 
 	if err := r.Run("127.0.0.1:8080"); err != nil {
