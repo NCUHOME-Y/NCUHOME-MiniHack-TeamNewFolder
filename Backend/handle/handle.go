@@ -71,5 +71,8 @@ func ApiUserUpdateBio(c *gin.Context, db *sql.DB) {
 
 	s := storage.NewStore(gormDB)
 	err = s.UserUpdateBio(id, req.Bio)
-
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据存储时发生错误" + err.Error()})
+		return
+	}
 }
