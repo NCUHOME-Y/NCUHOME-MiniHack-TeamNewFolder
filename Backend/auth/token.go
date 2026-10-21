@@ -30,10 +30,12 @@ func GenerateToken(db *sql.DB, userID uint64, ttl time.Duration) (rawToken strin
 	rawToken = base64.RawURLEncoding.EncodeToString(b)
 	tokenHash := TokenHash(rawToken)
 
-	expiresAt := time.Now().UTC().Add(ttl)
+	now := time.Now()
+	expiresAt := time.Now().Add(ttl)
+
 	_, err = db.Exec(
-		`INSERT INTO user_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)`,
-		userID, tokenHash, expiresAt,
+		`INSERT INTO user_tokens (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)`,
+		userID, tokenHash, expiresAt, now,
 	)
 
 	if err != nil {
