@@ -13,6 +13,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var ErrUserExists = errors.New("用户名已存在")
+
 type Store struct {
 	db *gorm.DB
 }
@@ -22,6 +24,11 @@ func NewStore(db *gorm.DB) *Store {
 }
 
 func (s *Store) CreateUser(ctx context.Context, username, password, bio string) (*User, error) {
+
+	if len(password) > 72 {
+		return nil, fmt.Errorf("密码过长")
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if err != nil {
 		return nil, fmt.Errorf("加密密码失败：%w", err)
@@ -34,6 +41,9 @@ func (s *Store) CreateUser(ctx context.Context, username, password, bio string) 
 		Bio:          sql.NullString{String: bio, Valid: bio != ""},
 	}
 
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return nil, ErrUserExists
+	}
 	if err := s.db.WithContext(ctx).Create(u).Error; err != nil {
 		return nil, err
 	}
@@ -55,21 +65,22 @@ func (s *Store) Login(ctx context.Context, username, password string) (*User, er
 	return u, nil
 }
 
-func (s *Store) GetUserByToken(ctx context.Context, token string) (*User, error) {
-
-	tokenhash := auth.TokenHash(token)
+func (s *Store) GetUserByToken(ctx context.Context, rawToken string) (*User, error) {
 
 	sqldb, err := s.db.DB()
 	if err != nil {
 		return nil, err
 	}
 
-	userID, err := auth.VerifyToken(sqldb, tokenhash)
+	userID, err := auth.VerifyToken(sqldb, rawToken)
 	if err != nil {
 		return nil, err
 	}
 
 	u, err := s.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 	return u, nil
 }
 
@@ -93,21 +104,18 @@ func (s *Store) GetUserByUsername(ctx context.Context, username string) (*User, 
 }
 
 func (s *Store) UserUpdateBio(id uint64, bio string) error {
-
 	bioNS := sql.NullString{String: bio, Valid: true}
 
-	err := s.db.Model(&User{}).Where("id = ?", id).Update("bio", bioNS)
-
+	err := s.db.Model(&User{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"bio": bioNS,
+	})
 	if err.Error != nil {
 		return err.Error
 	}
 	if err.RowsAffected == 0 {
-		return errors.New("用户不存在")
+		return errors.New("无变化")
 	}
 
-	s.db.Model(&User{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"bio": bio,
-	})
 	return nil
 }
 

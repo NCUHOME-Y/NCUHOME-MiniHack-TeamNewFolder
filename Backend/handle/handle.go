@@ -5,6 +5,8 @@ import (
 	"Backend/storage"
 	"Backend/trans"
 	"database/sql"
+	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -23,14 +25,18 @@ func ApiUsersRegister(c *gin.Context, s *storage.Store, db *sql.DB) {
 	}
 
 	user, err := s.CreateUser(c.Request.Context(), req.Username, req.Password, "")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "注册失败：" + err.Error()})
-		return
+	switch {
+	case errors.Is(err, storage.ErrUserExists):
+		c.JSON(http.StatusConflict, gin.H{"code": "USERNAME_TAKEN", "error": "用户名已被占用"})
+	default:
+		log.Printf("register failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "注册失败"})
 	}
 
 	token, err := auth.GenerateToken(db, user.ID, AccessTokenExpire)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Token生成失败：" + err.Error()})
+		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"message": "注册成功", "registerinfo": token})
 }
@@ -56,7 +62,7 @@ func ApiUserLogin(c *gin.Context, s *storage.Store, db *sql.DB) {
 	c.JSON(http.StatusOK, gin.H{"message": "登陆成功", "token": token})
 }
 
-func ApiUserUpdateBio(c *gin.Context, db *sql.DB) {
+func ApiUserUpdateBio(c *gin.Context, s *storage.Store) {
 	var req trans.UpdateBioReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误：" + err.Error()})
@@ -68,18 +74,16 @@ func ApiUserUpdateBio(c *gin.Context, db *sql.DB) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
 		return
 	}
-	id := userID.(uint64)
-
-	gormDB, err := storage.ConvertToGormDB(db)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库初始化失败: " + err.Error()})
+	id, ok := userID.(uint64)
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "登录状态异常"})
 		return
 	}
 
-	s := storage.NewStore(gormDB)
-	err = s.UserUpdateBio(id, req.Bio)
+	err := s.UserUpdateBio(id, req.Bio)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据存储时发生错误" + err.Error()})
 		return
 	}
+	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
 }
