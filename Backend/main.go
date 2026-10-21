@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	dsn := "user_1:123456@tcp(127.0.0.1:3306)/demo?parseTime=True"
+	dsn := "user_1:123456@tcp(127.0.0.1:3306)/demo?parseTime=True&loc=Local"
 	db, dberr := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if dberr != nil {
 		panic("链接数据库失败")
