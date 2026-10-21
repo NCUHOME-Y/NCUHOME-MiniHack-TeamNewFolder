@@ -1,7 +1,5 @@
 package trans
 
-import "database/sql"
-
 type RegisterReq struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -15,5 +13,5 @@ type Token struct {
 }
 
 type UpdateBioReq struct {
-	Bio sql.NullString `json:"bio"`
+	Bio string `json:"bio"`
 }

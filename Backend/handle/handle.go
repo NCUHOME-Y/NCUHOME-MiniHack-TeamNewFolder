@@ -29,6 +29,9 @@ func ApiUsersRegister(c *gin.Context, s *storage.Store, db *sql.DB) {
 	}
 
 	token, err := auth.GenerateToken(db, user.ID, AccessTokenExpire)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Token生成失败：" + err.Error()})
+	}
 	c.JSON(http.StatusCreated, gin.H{"message": "注册成功", "registerinfo": token})
 }
 
@@ -39,14 +42,18 @@ func ApiUserLogin(c *gin.Context, s *storage.Store, db *sql.DB) {
 		return
 	}
 
-	user, err := s.Login(c.Request.Context(), req.Username, req.Password, "")
+	user, err := s.Login(c.Request.Context(), req.Username, req.Password)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "注册失败：" + err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
 		return
 	}
 
 	token, err := auth.GenerateToken(db, user.ID, AccessTokenExpire)
-	c.JSON(http.StatusAlreadyReported, gin.H{"message": "登陆成功", "token": token})
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token获取失败：" + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "登陆成功", "token": token})
 }
 
 func ApiUserUpdateBio(c *gin.Context, db *sql.DB) {
