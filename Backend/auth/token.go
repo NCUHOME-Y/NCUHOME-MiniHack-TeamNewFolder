@@ -45,10 +45,11 @@ func GenerateToken(db *sql.DB, userID uint64, ttl time.Duration) (rawToken strin
 
 }
 
-func VerifyToken(db *sql.DB, tokenHash string) (userID uint64, err error) {
-	if tokenHash == "" {
+func VerifyToken(db *sql.DB, rawToken string) (userID uint64, err error) {
+	if rawToken == "" {
 		return 0, ErrTokenInvalid
 	}
+	tokenHash := TokenHash(rawToken)
 
 	var (
 		expiresAt time.Time
@@ -71,7 +72,7 @@ func VerifyToken(db *sql.DB, tokenHash string) (userID uint64, err error) {
 	if revoked == 1 {
 		return 0, ErrTokenInvalid
 	}
-	if time.Now().UTC().After(expiresAt) {
+	if time.Now().After(expiresAt) {
 		return 0, ErrTokenExpired
 	}
 	if status != 1 {

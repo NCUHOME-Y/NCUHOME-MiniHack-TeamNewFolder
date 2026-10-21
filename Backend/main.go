@@ -13,7 +13,7 @@ import (
 
 func main() {
 	dsn := "user_1:123456@tcp(127.0.0.1:3306)/demo?parseTime=True&loc=Local"
-	db, dberr := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	db, dberr := gorm.Open(mysql.Open(dsn), &gorm.Config{TranslateError: true})
 	if dberr != nil {
 		panic("链接数据库失败")
 	}
@@ -35,7 +35,7 @@ func main() {
 		protected := api.Group("/update")
 		protected.Use(auth.Auth(sqldb))
 		{
-			protected.POST("/bio", func(c *gin.Context) { handle.ApiUserUpdateBio(c, sqldb) })
+			protected.POST("/bio", func(c *gin.Context) { handle.ApiUserUpdateBio(c, s) })
 		}
 	}
 
