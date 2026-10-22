@@ -11,6 +11,7 @@ type Store struct {
 	db *sql.DB
 }
 
+// 所有需要已登录的操作，要经过此中间件验证Token，并把userID进行传递
 func Auth(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.GetHeader("Token")
