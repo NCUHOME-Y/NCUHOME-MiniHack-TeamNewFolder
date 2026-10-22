@@ -18,3 +18,13 @@ type UpdateBioReq struct {
 type UpdateAvatarReq struct {
 	AvatarURL string `json:"avatar_url"`
 }
+type CreatePost struct {
+	Token       string `json:"token"`
+	Type        int8   `json:"type"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	ImageURL    string `json:"image_url"`
+	Tags        string `json:"tags"`
+	Location    string `json:"location"`
+	ContactInfo string `json:"contact_info"`
+}

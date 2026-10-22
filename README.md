@@ -34,7 +34,7 @@
 | type         | tinyint         | NO   | MUL | NULL              |                                               |
 | title        | varchar(100)    | NO   |     | NULL              |                                               |
 | description  | text            | NO   |     | NULL              |                                               |
-| image_urls   | json            | YES  |     | NULL              |                                               |
+| image_url    | varchar(500)    | YES  |     | NULL              |                                               |
 | tags         | varchar(255)    | YES  |     | NULL              |                                               |
 | location     | varchar(255)    | NO   |     | NULL              |                                               |
 | contact_info | varchar(100)    | NO   |     | NULL              |                                               |

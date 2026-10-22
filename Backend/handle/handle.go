@@ -115,7 +115,7 @@ func ApiUserUpdateAvatar(c *gin.Context, s *storage.Store) {
 func ApiUserLogout(c *gin.Context, s *storage.Store) {
 	var req trans.Token
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误：" + err.Error()})
 		return
 	}
 
@@ -131,4 +131,38 @@ func ApiUserLogout(c *gin.Context, s *storage.Store) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "退出成功"})
+}
+
+func ApiUserCreatePost(c *gin.Context, s *storage.Store) {
+	var req trans.CreatePost
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误：" + err.Error()})
+		return
+	}
+
+	ID, exist := c.Get("userID")
+	if !exist {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		return
+	}
+	userID := ID.(uint64)
+
+	post := storage.Post{
+		UserID:      userID,
+		Type:        req.Type,
+		Title:       req.Title,
+		Description: req.Description,
+		ImageURL:    req.ImageURL,
+		Tags:        req.Tags,
+		Location:    req.Location,
+		ContactInfo: req.ContactInfo,
+		Status:      0,
+	}
+
+	err := s.UserCreatePost(&post)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "发布失败，请稍后重试"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "发布成功", "post_id": post.ID})
 }
