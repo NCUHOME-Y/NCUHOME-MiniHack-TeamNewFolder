@@ -87,3 +87,24 @@ func ApiUserUpdateBio(c *gin.Context, s *storage.Store) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
 }
+
+func ApiUserLogout(c *gin.Context, s *storage.Store) {
+	var req trans.Token
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		return
+	}
+
+	_, exist := c.Get("userID")
+	if !exist {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		return
+	}
+
+	err := s.DeleteToken(req.Token)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库访问失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "退出成功"})
+}
