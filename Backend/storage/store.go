@@ -139,3 +139,13 @@ func ConvertToGormDB(sqlDB *sql.DB) (*gorm.DB, error) {
 
 	return gormDB, nil
 }
+
+func (s *Store) DeleteToken(rawToken string) error {
+	tokenHash := auth.TokenHash(rawToken)
+
+	result := s.db.Where("token_hash = ?", tokenHash).Update("revoked", 1)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}

@@ -36,6 +36,7 @@ func main() {
 		protected.Use(auth.Auth(sqldb))
 		{
 			protected.POST("/bio", func(c *gin.Context) { handle.ApiUserUpdateBio(c, s) })
+			protected.POST("/logout", func(c *gin.Context) { handle.ApiUserLogout(c, s) })
 		}
 	}
 
