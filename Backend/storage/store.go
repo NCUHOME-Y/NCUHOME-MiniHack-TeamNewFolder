@@ -14,6 +14,7 @@ import (
 )
 
 var ErrUserExists = errors.New("用户名已存在")
+var DefaultImage = "https://i.imgs.ovh/2026/10/22/9aaf8be43feca969d89e45781b6abbc4.png"
 
 type Store struct {
 	db *gorm.DB
@@ -39,6 +40,7 @@ func (s *Store) CreateUser(ctx context.Context, username, password, bio string) 
 		Username:     username,
 		PasswordHash: string(hash),
 		Bio:          sql.NullString{String: bio, Valid: bio != ""},
+		AvatarURL:    DefaultImage,
 	}
 
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -116,6 +118,18 @@ func (s *Store) UserUpdateBio(id uint64, bio string) error {
 		return errors.New("无变化")
 	}
 
+	return nil
+}
+func (s *Store) UserUpdateAvatar(id uint64, avatarURL string) error {
+	err := s.db.Model(&User{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"avatar_url": avatarURL,
+	})
+	if err.Error != nil {
+		return err.Error
+	}
+	if err.RowsAffected == 0 {
+		return errors.New("无变化")
+	}
 	return nil
 }
 

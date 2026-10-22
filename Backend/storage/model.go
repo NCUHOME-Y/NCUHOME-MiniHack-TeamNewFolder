@@ -11,5 +11,6 @@ type User struct {
 	Username     string         `gorm:"type:varchar(32);unique"`
 	PasswordHash string         `gorm:"type:varchar(255)" json:"-"`
 	Bio          sql.NullString `gorm:"type:text"`
+	AvatarURL    string         `gorm:"column:avatar_url;size:255;default:null" json:"avatar_url"`
 	CreatAt      time.Time      `gorm:"not null;default:CURRENT_TIMESTAMP"`
 }

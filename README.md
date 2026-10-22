@@ -7,6 +7,7 @@
 | id            | bigint unsigned | NO   | PRI | NULL              | auto_increment    |
 | account_id    | varchar(36)     | YES  | UNI | NULL              |                   |
 | username      | varchar(32)     | YES  | UNI | NULL              |                   |
+| avatar_url    | varchar(255)    | YES  |     | NULL              |                   |
 | password_hash | varchar(255)    | YES  |     | NULL              |                   |
 | bio           | text            | YES  |     | NULL              |                   |
 | creat_at      | datetime        | NO   |     | CURRENT_TIMESTAMP | DEFAULT_GENERATED |
@@ -23,4 +24,21 @@
 | revoked    | tinyint         | NO   |     | 0                 |                   |
 | created_at | timestamp       | NO   |     | CURRENT_TIMESTAMP | DEFAULT_GENERATED |
 +------------+-----------------+------+-----+-------------------+-------------------+
-备注：user_tokens.user_id是user.id
+
+//posts建表信息
++--------------+-----------------+------+-----+-------------------+-----------------------------------------------+
+| Field        | Type            | Null | Key | Default           | Extra                                         |
++--------------+-----------------+------+-----+-------------------+-----------------------------------------------+
+| id           | bigint unsigned | NO   | PRI | NULL              | auto_increment                                |
+| user_id      | bigint unsigned | NO   | MUL | NULL              |                                               |
+| type         | tinyint         | NO   | MUL | NULL              |                                               |
+| title        | varchar(100)    | NO   |     | NULL              |                                               |
+| description  | text            | NO   |     | NULL              |                                               |
+| image_urls   | json            | YES  |     | NULL              |                                               |
+| tags         | varchar(255)    | YES  |     | NULL              |                                               |
+| location     | varchar(255)    | NO   |     | NULL              |                                               |
+| contact_info | varchar(100)    | NO   |     | NULL              |                                               |
+| status       | tinyint         | NO   |     | 0                 |                                               |
+| created_at   | timestamp       | NO   | MUL | CURRENT_TIMESTAMP | DEFAULT_GENERATED                             |
+| updated_at   | timestamp       | NO   |     | CURRENT_TIMESTAMP | DEFAULT_GENERATED on update CURRENT_TIMESTAMP |
++--------------+-----------------+------+-----+-------------------+-----------------------------------------------+
