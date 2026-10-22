@@ -14,10 +14,10 @@ type Token struct {
 	Token string `json:"token"`
 }
 type PostListReq struct {
-	Page     int    `form:"page,default=1" binding:"min=1"`
-	PageSize int    `form:"page_size,default=10" binding:"min=1,max=50"`
-	Type     *int8  `form:"type"` // 指针，因为 0 是无效值，没传就是 nil
-	Keyword  string `form:"keyword"`
+	Page     int    `json:"page" form:"page,default=1" binding:"min=1"`
+	PageSize int    `json:"page_size" form:"page_size,default=10" binding:"min=1,max=50"`
+	Type     *int8  `json:"type" form:"type"` // 指针，因为 0 是无效值，没传就是 nil
+	Keyword  string `json:"keyword" form:"keyword"`
 }
 type PostListItem struct {
 	ID          uint64    `json:"id"`
