@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// 默认Token过期时间
 const (
 	AccessTokenExpire = 4 * time.Hour
 )
