@@ -15,3 +15,6 @@ type Token struct {
 type UpdateBioReq struct {
 	Bio string `json:"bio"`
 }
+type UpdateAvatarReq struct {
+	AvatarURL string `json:"avatar_url"`
+}

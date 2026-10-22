@@ -87,6 +87,30 @@ func ApiUserUpdateBio(c *gin.Context, s *storage.Store) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
 }
+func ApiUserUpdateAvatar(c *gin.Context, s *storage.Store) {
+	var req trans.UpdateAvatarReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误：" + err.Error()})
+		return
+	}
+
+	userID, exist := c.Get("userID")
+	if !exist {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		return
+	}
+	id, ok := userID.(uint64)
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "登录状态异常"})
+		return
+	}
+	err := s.UserUpdateAvatar(id, req.AvatarURL)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据存储时发生错误" + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
+}
 
 func ApiUserLogout(c *gin.Context, s *storage.Store) {
 	var req trans.Token

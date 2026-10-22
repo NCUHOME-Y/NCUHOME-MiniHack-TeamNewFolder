@@ -120,6 +120,18 @@ func (s *Store) UserUpdateBio(id uint64, bio string) error {
 
 	return nil
 }
+func (s *Store) UserUpdateAvatar(id uint64, avatarURL string) error {
+	err := s.db.Model(&User{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"avatar_url": avatarURL,
+	})
+	if err.Error != nil {
+		return err.Error
+	}
+	if err.RowsAffected == 0 {
+		return errors.New("无变化")
+	}
+	return nil
+}
 
 func ConvertToGormDB(sqlDB *sql.DB) (*gorm.DB, error) {
 	// 检查传入的 sqlDB 是否为空
