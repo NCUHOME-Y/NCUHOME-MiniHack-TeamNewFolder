@@ -7,6 +7,7 @@
 | id            | bigint unsigned | NO   | PRI | NULL              | auto_increment    |
 | account_id    | varchar(36)     | YES  | UNI | NULL              |                   |
 | username      | varchar(32)     | YES  | UNI | NULL              |                   |
+| avatar_url    | varchar(255)    | YES  |     | NULL              |                   |
 | password_hash | varchar(255)    | YES  |     | NULL              |                   |
 | bio           | text            | YES  |     | NULL              |                   |
 | creat_at      | datetime        | NO   |     | CURRENT_TIMESTAMP | DEFAULT_GENERATED |
