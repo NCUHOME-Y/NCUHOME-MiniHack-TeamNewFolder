@@ -29,8 +29,8 @@ func main() {
 	api := r.Group("/api")
 	{
 		api.POST("/users/register", func(c *gin.Context) { handle.ApiUsersRegister(c, s, sqldb) })
-
 		api.POST("/users/login", func(c *gin.Context) { handle.ApiUserLogin(c, s, sqldb) })
+		api.GET("/posts", func(c *gin.Context) { handle.ApiGetPostList(c, s) })
 
 		protected := api.Group("/update")
 		protected.Use(auth.Auth(sqldb))

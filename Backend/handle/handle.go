@@ -166,3 +166,36 @@ func ApiUserCreatePost(c *gin.Context, s *storage.Store) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "发布成功", "post_id": post.ID})
 }
+
+func ApiGetPostList(c *gin.Context, s *storage.Store) {
+	var req trans.PostListReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误：" + err.Error()})
+		return
+	}
+
+	offset := (req.Page - 1) * req.PageSize
+	limit := req.PageSize
+
+	var queryType int8 = 0
+	if req.Type != nil {
+		queryType = *req.Type
+	}
+
+	defaultStatus := int8(-1)
+	list, total, err := s.GetPostList(queryType, defaultStatus, offset, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取列表失败，请稍后重试"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "获取成功",
+		"data": gin.H{
+			"total":     total,
+			"page":      req.Page,
+			"page_size": req.PageSize,
+			"list":      list,
+		},
+	})
+}
