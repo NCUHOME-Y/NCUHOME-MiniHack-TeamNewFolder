@@ -44,10 +44,10 @@ func (s *Store) CreateUser(ctx context.Context, username, password, bio string) 
 		AvatarURL:    DefaultImage,
 	}
 
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return nil, ErrUserExists
-	}
 	if err := s.DB.WithContext(ctx).Create(u).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, ErrUserExists
+		}
 		return nil, err
 	}
 
