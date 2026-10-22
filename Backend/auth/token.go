@@ -54,14 +54,13 @@ func VerifyToken(db *sql.DB, rawToken string) (userID uint64, err error) {
 	var (
 		expiresAt time.Time
 		revoked   int
-		status    int
 	)
 	err = db.QueryRow(`
-		SELECT t.user_id, t.expires_at, t.revoked, u.status
+		SELECT t.user_id, t.expires_at, t.revoked
 		FROM user_tokens t
 		JOIN users u ON u.id = t.user_id
 		WHERE t.token_hash = ?`, tokenHash).
-		Scan(&userID, &expiresAt, &revoked, &status)
+		Scan(&userID, &expiresAt, &revoked)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrTokenInvalid
 	}
@@ -74,9 +73,6 @@ func VerifyToken(db *sql.DB, rawToken string) (userID uint64, err error) {
 	}
 	if time.Now().After(expiresAt) {
 		return 0, ErrTokenExpired
-	}
-	if status != 1 {
-		return 0, ErrTokenInvalid // 账号被禁用
 	}
 	return userID, nil
 
