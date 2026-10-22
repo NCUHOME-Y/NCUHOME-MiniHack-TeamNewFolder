@@ -163,3 +163,11 @@ func (s *Store) DeleteToken(rawToken string) error {
 	}
 	return nil
 }
+
+func (s *Store) UserCreatePost(p *Post) error {
+	err := s.db.Create(&p).Error
+	if err != nil {
+		return err
+	}
+	return nil
+}

@@ -35,6 +35,7 @@ func main() {
 		protected := api.Group("/update")
 		protected.Use(auth.Auth(sqldb))
 		{
+			protected.POST("/create/post", func(c *gin.Context) { handle.ApiUserCreatePost(c, s) })
 			protected.POST("/bio", func(c *gin.Context) { handle.ApiUserUpdateBio(c, s) })
 			protected.POST("/avatar", func(c *gin.Context) { handle.ApiUserUpdateAvatar(c, s) })
 			protected.POST("/logout", func(c *gin.Context) { handle.ApiUserLogout(c, s) })
