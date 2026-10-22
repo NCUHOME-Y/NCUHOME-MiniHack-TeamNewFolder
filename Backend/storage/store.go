@@ -2,6 +2,7 @@ package storage
 
 import (
 	"Backend/auth"
+	"Backend/trans"
 	"context"
 	"database/sql"
 	"errors"
@@ -17,11 +18,11 @@ var ErrUserExists = errors.New("用户名已存在")
 var DefaultImage = "https://i.imgs.ovh/2026/10/22/9aaf8be43feca969d89e45781b6abbc4.png"
 
 type Store struct {
-	db *gorm.DB
+	DB *gorm.DB
 }
 
 func NewStore(db *gorm.DB) *Store {
-	return &Store{db: db}
+	return &Store{DB: db}
 }
 
 func (s *Store) CreateUser(ctx context.Context, username, password, bio string) (*User, error) {
@@ -46,7 +47,7 @@ func (s *Store) CreateUser(ctx context.Context, username, password, bio string) 
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return nil, ErrUserExists
 	}
-	if err := s.db.WithContext(ctx).Create(u).Error; err != nil {
+	if err := s.DB.WithContext(ctx).Create(u).Error; err != nil {
 		return nil, err
 	}
 
@@ -69,7 +70,7 @@ func (s *Store) Login(ctx context.Context, username, password string) (*User, er
 
 func (s *Store) GetUserByToken(ctx context.Context, rawToken string) (*User, error) {
 
-	sqldb, err := s.db.DB()
+	sqldb, err := s.DB.DB()
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +89,7 @@ func (s *Store) GetUserByToken(ctx context.Context, rawToken string) (*User, err
 
 func (s *Store) GetUserByID(ctx context.Context, id uint64) (*User, error) {
 	var u User
-	err := s.db.WithContext(ctx).Where("id = ?", id).First(&u).Error
+	err := s.DB.WithContext(ctx).Where("id = ?", id).First(&u).Error
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +98,7 @@ func (s *Store) GetUserByID(ctx context.Context, id uint64) (*User, error) {
 
 func (s *Store) GetUserByUsername(ctx context.Context, username string) (*User, error) {
 	var u User
-	err := s.db.WithContext(ctx).Where("username = ?", username).First(&u).Error
+	err := s.DB.WithContext(ctx).Where("username = ?", username).First(&u).Error
 
 	if err != nil {
 		return nil, err
@@ -108,7 +109,7 @@ func (s *Store) GetUserByUsername(ctx context.Context, username string) (*User, 
 func (s *Store) UserUpdateBio(id uint64, bio string) error {
 	bioNS := sql.NullString{String: bio, Valid: true}
 
-	err := s.db.Model(&User{}).Where("id = ?", id).Updates(map[string]interface{}{
+	err := s.DB.Model(&User{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"bio": bioNS,
 	})
 	if err.Error != nil {
@@ -121,7 +122,7 @@ func (s *Store) UserUpdateBio(id uint64, bio string) error {
 	return nil
 }
 func (s *Store) UserUpdateAvatar(id uint64, avatarURL string) error {
-	err := s.db.Model(&User{}).Where("id = ?", id).Updates(map[string]interface{}{
+	err := s.DB.Model(&User{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"avatar_url": avatarURL,
 	})
 	if err.Error != nil {
@@ -157,7 +158,7 @@ func ConvertToGormDB(sqlDB *sql.DB) (*gorm.DB, error) {
 func (s *Store) DeleteToken(rawToken string) error {
 	tokenHash := auth.TokenHash(rawToken)
 
-	result := s.db.Where("token_hash = ?", tokenHash).Update("revoked", 1)
+	result := s.DB.Where("token_hash = ?", tokenHash).Update("revoked", 1)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -165,9 +166,68 @@ func (s *Store) DeleteToken(rawToken string) error {
 }
 
 func (s *Store) UserCreatePost(p *Post) error {
-	err := s.db.Create(&p).Error
+	err := s.DB.Create(&p).Error
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (s *Store) GetPostList(postType int8, status int8, offset int, limit int) ([]trans.PostListItem, int64, error) {
+	query := s.DB.Table("posts").Model(&Post{})
+
+	//根据过滤信息调整返回帖子
+	if postType > 0 {
+		query = query.Where("type = ?", postType)
+	}
+	if status >= 0 {
+		query = query.Where("status = ?", status)
+	}
+
+	var tol int64 //符合要求帖子总数
+	if err := query.Count(&tol).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var posts []Post
+	err := query.Order("created_at DESC").Offset(offset).Limit(limit).Find(&posts).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var userIDs []uint64
+	for _, p := range posts {
+		userIDs = append(userIDs, p.UserID)
+	}
+
+	var users []User
+	if len(userIDs) > 0 {
+		s.DB.Where("id IN ?", userIDs).Find(&users)
+	}
+	userMap := make(map[uint64]User)
+	for _, u := range users {
+		userMap[u.ID] = u
+	}
+
+	var list []trans.PostListItem
+	for _, p := range posts {
+		item := trans.PostListItem{
+			ID:          p.ID,
+			Title:       p.Title,
+			Description: p.Description,
+			ImageURL:    p.ImageURL,
+			Type:        p.Type,
+			Tags:        p.Tags,
+			Location:    p.Location,
+			Status:      p.Status,
+			CreatedAt:   p.CreatedAt,
+
+			// 发帖人简易信息
+			UserID:    p.UserID,
+			Username:  userMap[p.UserID].Username,
+			AvatarURL: userMap[p.UserID].AvatarURL,
+		}
+		list = append(list, item)
+	}
+	return list, tol, nil
 }
