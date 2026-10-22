@@ -44,10 +44,10 @@ func (s *Store) CreateUser(ctx context.Context, username, password, bio string) 
 		AvatarURL:    DefaultImage,
 	}
 
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return nil, ErrUserExists
-	}
 	if err := s.DB.WithContext(ctx).Create(u).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, ErrUserExists
+		}
 		return nil, err
 	}
 
@@ -57,12 +57,12 @@ func (s *Store) CreateUser(ctx context.Context, username, password, bio string) 
 func (s *Store) Login(ctx context.Context, username, password string) (*User, error) {
 	u, uerr := s.GetUserByUsername(ctx, username)
 	if uerr != nil {
-		return nil, fmt.Errorf("用户不存在：%w", uerr)
+		return nil, fmt.Errorf("用户名或密码错误：%w", uerr)
 	}
 
 	hasherr := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password))
 	if hasherr != nil {
-		return nil, fmt.Errorf("密码错误：%w", hasherr)
+		return nil, fmt.Errorf("用户名或密码错误：%w", hasherr)
 	}
 
 	return u, nil
@@ -93,7 +93,7 @@ func (s *Store) GetUserByID(ctx context.Context, id uint64) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &u, err
+	return &u, nil
 }
 
 func (s *Store) GetUserByUsername(ctx context.Context, username string) (*User, error) {
@@ -107,20 +107,24 @@ func (s *Store) GetUserByUsername(ctx context.Context, username string) (*User, 
 }
 
 func (s *Store) UserUpdateBio(id uint64, bio string) error {
-	bioNS := sql.NullString{String: bio, Valid: true}
-
+	//k修改：原代码和CeatUser内Valid: bio != ""数据类型不同
+	//bioNS := sql.NullString{String: bio, Valid: true}
+	bioNS := sql.NullString{String: bio, Valid: bio != ""}
+	//
 	err := s.DB.Model(&User{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"bio": bioNS,
 	})
 	if err.Error != nil {
 		return err.Error
 	}
-	if err.RowsAffected == 0 {
-		return errors.New("无变化")
-	}
+
+	// if err.RowsAffected == 0 {
+	// 	return errors.New("无变化")
+	// }
 
 	return nil
 }
+
 func (s *Store) UserUpdateAvatar(id uint64, avatarURL string) error {
 	err := s.DB.Model(&User{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"avatar_url": avatarURL,
@@ -128,9 +132,9 @@ func (s *Store) UserUpdateAvatar(id uint64, avatarURL string) error {
 	if err.Error != nil {
 		return err.Error
 	}
-	if err.RowsAffected == 0 {
-		return errors.New("无变化")
-	}
+	// if err.RowsAffected == 0 {
+	// 	return errors.New("无变化")
+	// }
 	return nil
 }
 
@@ -158,24 +162,29 @@ func ConvertToGormDB(sqlDB *sql.DB) (*gorm.DB, error) {
 func (s *Store) DeleteToken(rawToken string) error {
 	tokenHash := auth.TokenHash(rawToken)
 
-	result := s.DB.Where("token_hash = ?", tokenHash).Update("revoked", 1)
+	// 必须显式指定表名：Update 前没有 Model 时 GORM 无法推断操作哪张表
+	result := s.DB.Table("user_tokens").Where("token_hash = ?", tokenHash).Update("revoked", 1)
 	if result.Error != nil {
 		return result.Error
 	}
 	return nil
 }
 
-func (s *Store) UserCreatePost(p *Post) error {
-	err := s.DB.Create(&p).Error
+// 加了ctx
+func (s *Store) UserCreatePost(ctx context.Context, p *Post) error {
+	//err := s.DB.Create(&p).Error
+	err := s.DB.WithContext(ctx).Create(&p).Error
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *Store) GetPostList(postType int8, status int8, offset int, limit int) ([]trans.PostListItem, int64, error) {
-	query := s.DB.Table("posts").Model(&Post{})
+// 加ctx，防止超时处理
+func (s *Store) GetPostList(ctx context.Context, postType int8, status int8, offset int, limit int) ([]trans.PostListItem, int64, error) {
+	//query := s.DB.Table("posts").Model(&Post{})
 
+	query := s.DB.WithContext(ctx).Table("posts").Model(&Post{})
 	//根据过滤信息调整返回帖子
 	if postType > 0 {
 		query = query.Where("type = ?", postType)
@@ -202,7 +211,9 @@ func (s *Store) GetPostList(postType int8, status int8, offset int, limit int) (
 
 	var users []User
 	if len(userIDs) > 0 {
-		s.DB.Where("id IN ?", userIDs).Find(&users)
+		if err := s.DB.WithContext(ctx).Where("id IN ?", userIDs).Find(&users).Error; err != nil {
+			return nil, 0, err
+		} //加了个传错误
 	}
 	userMap := make(map[uint64]User)
 	for _, u := range users {

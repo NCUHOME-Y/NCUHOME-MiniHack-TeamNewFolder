@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +18,29 @@ const (
 	AccessTokenExpire = 4 * time.Hour
 )
 
+// bindJSON 解析 JSON 请求体；请求体为空时直接跳过绑定。
+// 用于 logout 这类「body 可选」的接口，避免前端不传 body 时被判成 400。
+func bindJSON(c *gin.Context, obj any) error {
+	if c.Request.ContentLength == 0 {
+		return nil
+	}
+	return c.ShouldBindJSON(obj)
+}
+
+// isSafeURL 判断地址是否可以入库：仅允许 http/https 绝对地址或站内绝对路径，
+// 用于挡住 javascript:、data: 等会被前端渲染执行的协议（存储型 XSS）。
+func isSafeURL(raw string) bool {
+	u := strings.TrimSpace(raw)
+	if u == "" {
+		return false
+	}
+	if strings.HasPrefix(u, "/") && !strings.HasPrefix(u, "//") {
+		return true // 站内绝对路径，如 /uploads/a.png
+	}
+	lower := strings.ToLower(u)
+	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
+}
+
 func ApiUsersRegister(c *gin.Context, s *storage.Store, db *sql.DB) {
 	var req trans.RegisterReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -25,17 +49,21 @@ func ApiUsersRegister(c *gin.Context, s *storage.Store, db *sql.DB) {
 	}
 
 	user, err := s.CreateUser(c.Request.Context(), req.Username, req.Password, "")
-	switch {
-	case errors.Is(err, storage.ErrUserExists):
-		c.JSON(http.StatusConflict, gin.H{"code": "USERNAME_TAKEN", "error": "用户名已被占用"})
-	default:
+	if err != nil {
+		// 必须 return，否则会继续往下用 nil user 取 user.ID 并二次写响应
+		if errors.Is(err, storage.ErrUserExists) {
+			c.JSON(http.StatusConflict, gin.H{"code": "USERNAME_TAKEN", "error": "用户名已被占用"})
+			return
+		}
 		log.Printf("register failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "注册失败"})
+		return
 	}
 
 	token, err := auth.GenerateToken(db, user.ID, AccessTokenExpire)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Token生成失败：" + err.Error()})
+		log.Printf("generate token failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Token生成失败"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"message": "注册成功", "registerinfo": token})
@@ -56,7 +84,9 @@ func ApiUserLogin(c *gin.Context, s *storage.Store, db *sql.DB) {
 
 	token, err := auth.GenerateToken(db, user.ID, AccessTokenExpire)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token获取失败：" + err.Error()})
+		// 这是服务端故障，不是认证失败，应返回 500
+		log.Printf("generate token failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Token获取失败"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "登陆成功", "token": token})
@@ -82,11 +112,14 @@ func ApiUserUpdateBio(c *gin.Context, s *storage.Store) {
 
 	err := s.UserUpdateBio(id, req.Bio)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据存储时发生错误" + err.Error()})
+		// 错误详情只进日志，不回显给客户端
+		log.Printf("update bio failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据存储时发生错误"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
 }
+
 func ApiUserUpdateAvatar(c *gin.Context, s *storage.Store) {
 	var req trans.UpdateAvatarReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -104,9 +137,17 @@ func ApiUserUpdateAvatar(c *gin.Context, s *storage.Store) {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "登录状态异常"})
 		return
 	}
+	// 只接受 http/https 绝对地址或站内绝对路径，避免 javascript: 之类被前端渲染执行
+	if req.AvatarURL != "" && !isSafeURL(req.AvatarURL) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "头像地址不合法"})
+		return
+	}
+
 	err := s.UserUpdateAvatar(id, req.AvatarURL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据存储时发生错误" + err.Error()})
+		// 错误详情只进日志，不回显给客户端
+		log.Printf("update avatar failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据存储时发生错误"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
@@ -114,7 +155,8 @@ func ApiUserUpdateAvatar(c *gin.Context, s *storage.Store) {
 
 func ApiUserLogout(c *gin.Context, s *storage.Store) {
 	var req trans.Token
-	if err := c.ShouldBindJSON(&req); err != nil {
+	// body 可选：不传也能退，此时用请求头里的令牌
+	if err := bindJSON(c, &req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误：" + err.Error()})
 		return
 	}
@@ -125,7 +167,16 @@ func ApiUserLogout(c *gin.Context, s *storage.Store) {
 		return
 	}
 
-	err := s.DeleteToken(req.Token)
+	rawToken := req.Token
+	if rawToken == "" {
+		rawToken = c.GetHeader("Token")
+	}
+	if rawToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少要注销的令牌"})
+		return
+	}
+
+	err := s.DeleteToken(rawToken)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库访问失败"})
 		return
@@ -145,7 +196,11 @@ func ApiUserCreatePost(c *gin.Context, s *storage.Store) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
 		return
 	}
-	userID := ID.(uint64)
+	userID, ok := ID.(uint64)
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "登录状态异常"})
+		return
+	}
 
 	post := storage.Post{
 		UserID:      userID,
@@ -159,7 +214,7 @@ func ApiUserCreatePost(c *gin.Context, s *storage.Store) {
 		Status:      0,
 	}
 
-	err := s.UserCreatePost(&post)
+	err := s.UserCreatePost(c.Request.Context(), &post)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "发布失败，请稍后重试"})
 		return
@@ -169,9 +224,22 @@ func ApiUserCreatePost(c *gin.Context, s *storage.Store) {
 
 func ApiGetPostList(c *gin.Context, s *storage.Store) {
 	var req trans.PostListReq
-	if err := c.ShouldBindJSON(&req); err != nil {
+	// GET 请求没有 body，用 ShouldBind 会由框架按方法自动选择绑定器：
+	// GET → query（form 标签与 default 生效），若以后改成 POST + JSON 也能兼容。
+	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误：" + err.Error()})
 		return
+	}
+
+	// 兜底，防止 limit/offset 为 0 时 GORM 视作不限制而返回整表
+	if req.Page < 1 {
+		req.Page = 1
+	}
+	if req.PageSize < 1 {
+		req.PageSize = 10
+	}
+	if req.PageSize > 50 {
+		req.PageSize = 50
 	}
 
 	offset := (req.Page - 1) * req.PageSize
@@ -183,7 +251,7 @@ func ApiGetPostList(c *gin.Context, s *storage.Store) {
 	}
 
 	defaultStatus := int8(-1)
-	list, total, err := s.GetPostList(queryType, defaultStatus, offset, limit)
+	list, total, err := s.GetPostList(c.Request.Context(), queryType, defaultStatus, offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取列表失败，请稍后重试"})
 		return

@@ -10,10 +10,10 @@ import (
 type Store struct {
 	db *sql.DB
 }
-
+//中间件验证登录
 func Auth(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		token := c.GetHeader("Token")
+		token := c.GetHeader("Token")	//抓用户数据
 		userID, err := VerifyToken(db, token)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "用户校验未通过"})
