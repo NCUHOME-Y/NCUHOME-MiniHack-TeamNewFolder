@@ -55,7 +55,7 @@ type PostDetail struct {
 }
 
 type UpdateBioReq struct {
-	Bio string `json:"bio"`
+	Bio string `json:"bio" binding:"max=500"`
 }
 type UpdateAvatarReq struct {
 	// 长度与 avatar_url varchar(255) 对齐
@@ -67,7 +67,7 @@ type CreatePost struct {
 	// 缺字段时由 HTTP 层返回 400，而不是让 MySQL 报约束错误后再返回 500
 	Type        int8   `json:"type" binding:"required,oneof=1 2"`
 	Title       string `json:"title" binding:"required,max=100"`
-	Description string `json:"description" binding:"required"`
+	Description string `json:"description" binding:"required,max=5000"`
 	ImageURL    string `json:"image_url" binding:"omitempty,max=500"`
 	Tags        string `json:"tags" binding:"omitempty,max=255"`
 	Location    string `json:"location" binding:"required,max=255"`
