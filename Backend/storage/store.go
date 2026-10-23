@@ -27,8 +27,8 @@ func NewStore(db *gorm.DB) *Store {
 
 func (s *Store) CreateUser(ctx context.Context, username, password, bio string) (*User, error) {
 
-	if len(password) > 72 {
-		return nil, fmt.Errorf("密码过长")
+	if len([]byte(password)) > 72 {
+		return nil, errors.New("密码过长")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
