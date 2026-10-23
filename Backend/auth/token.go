@@ -67,7 +67,6 @@ func VerifyToken(db *sql.DB, rawToken string) (userID uint64, err error) {
 		JOIN users u ON u.id = t.user_id
 		WHERE t.token_hash = ?`, tokenHash).
 		Scan(&userID, &expiresAt, &revoked)
-
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrTokenInvalid
 	}
