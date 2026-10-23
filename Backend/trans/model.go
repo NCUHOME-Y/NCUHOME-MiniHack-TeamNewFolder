@@ -36,6 +36,24 @@ type PostListItem struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
+type PostDetailReq struct {
+	ID uint64 `json:"id"`
+}
+type PostDetail struct {
+	ID           uint64    `json:"id"`
+	Type         int8      `json:"type"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	ImageURL     string    `json:"image_url"`
+	ImageURLs    []string  `json:"image_urls"`
+	Tags         string    `json:"tags"`
+	Location     string    `json:"location"`
+	ContactInfo  string    `json:"contact_info"`
+	Status       int8      `json:"status"`
+	CommentCount uint32    `json:"comment_count"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
 type UpdateBioReq struct {
 	Bio string `json:"bio"`
 }

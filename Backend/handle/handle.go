@@ -294,3 +294,22 @@ func ApiGetPostList(c *gin.Context, s *storage.Store) {
 		},
 	})
 }
+
+func ApiPostContactInfo(c *gin.Context, s *storage.Store) {
+	var req trans.PostDetailReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误：" + err.Error()})
+		return
+	}
+
+	query, err := s.GetPostDetail(req.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取列表详细信息失败，请稍后重试"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "获取成功",
+		"contactinfo": query.ContactInfo,
+	})
+}

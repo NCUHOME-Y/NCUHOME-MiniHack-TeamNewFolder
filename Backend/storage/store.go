@@ -242,3 +242,15 @@ func (s *Store) GetPostList(ctx context.Context, postType int8, status int8, off
 	}
 	return list, tol, nil
 }
+
+func (s *Store) GetPostDetail(postID uint64) (*Post, error) {
+	var post Post
+	err := s.DB.Table("posts").Where("id = ?", postID).First(&post).Error
+	if err != nil {
+		return nil, errors.New("帖子不存在")
+	}
+	if post.Status != 0 {
+		return nil, errors.New("帖子已截")
+	}
+	return &post, nil
+}

@@ -100,18 +100,20 @@ func main() {
 		// 新增：评论列表，公开，不需要登录
 		api.GET("/posts/:id/comments", func(c *gin.Context) { handle.ApiGetCommentList(c, s) })
 
-		protected := api.Group("/update")
+		protected := api.Group("")
 		protected.Use(auth.Auth(sqldb))
 		{
-			protected.POST("/create/post", func(c *gin.Context) { handle.ApiUserCreatePost(c, s) })
-			protected.POST("/bio", func(c *gin.Context) { handle.ApiUserUpdateBio(c, s) })
-			protected.POST("/avatar", func(c *gin.Context) { handle.ApiUserUpdateAvatar(c, s) })
-			protected.POST("/logout", func(c *gin.Context) { handle.ApiUserLogout(c, s) })
+			protected.POST("/update/create/post", func(c *gin.Context) { handle.ApiUserCreatePost(c, s) })
+			protected.POST("/update/bio", func(c *gin.Context) { handle.ApiUserUpdateBio(c, s) })
+			protected.POST("/update/avatar", func(c *gin.Context) { handle.ApiUserUpdateAvatar(c, s) })
+			protected.POST("/update/logout", func(c *gin.Context) { handle.ApiUserLogout(c, s) })
+
+			protected.GET("/posts/:id/contactinfo", func(c *gin.Context) { handle.ApiPostContactInfo(c, s) })
 
 			// 新增：发评论、删评论、上传图片，都需要 Token
-			protected.POST("/comments", func(c *gin.Context) { handle.ApiCreateComment(c, s) })
-			protected.DELETE("/comments/:id", func(c *gin.Context) { handle.ApiDeleteComment(c, s) })
-			protected.POST("/upload", func(c *gin.Context) { handle.ApiUploadImage(c) })
+			protected.POST("/update/comments", func(c *gin.Context) { handle.ApiCreateComment(c, s) })
+			protected.DELETE("/update/comments/:id", func(c *gin.Context) { handle.ApiDeleteComment(c, s) })
+			protected.POST("/update/upload", func(c *gin.Context) { handle.ApiUploadImage(c) })
 		}
 	}
 
