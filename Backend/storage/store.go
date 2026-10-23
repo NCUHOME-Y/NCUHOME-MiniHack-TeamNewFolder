@@ -15,7 +15,7 @@ import (
 )
 
 var ErrUserExists = errors.New("用户名已存在")
-var DefaultImage = "https://i.imgs.ovh/2026/10/22/9aaf8be43feca969d89e45781b6abbc4.png"
+var DefaultImage = "https://i.imgs.ovh/2026/10/22/9aaf8be43feca969d89e45781b6abbc4.png" //默认用户头像url
 
 type Store struct {
 	DB *gorm.DB
@@ -233,7 +233,7 @@ func (s *Store) GetPostList(ctx context.Context, postType int8, status int8, off
 			Status:      p.Status,
 			CreatedAt:   p.CreatedAt,
 
-			// 发帖人简易信息
+			// 发帖人简易信息，防止非必要信息泄露
 			UserID:    p.UserID,
 			Username:  userMap[p.UserID].Username,
 			AvatarURL: userMap[p.UserID].AvatarURL,
