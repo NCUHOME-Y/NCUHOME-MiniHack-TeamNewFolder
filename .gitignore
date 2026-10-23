@@ -1,0 +1,12 @@
+# 编译产物
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# 用户上传的图片（每次运行都会生成，不入库）
+Backend/uploads/
+
+# 依赖与本地环境
+.env
