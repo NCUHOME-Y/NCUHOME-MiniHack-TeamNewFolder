@@ -107,13 +107,14 @@ func main() {
 			protected.POST("/update/bio", func(c *gin.Context) { handle.ApiUserUpdateBio(c, s) })
 			protected.POST("/update/avatar", func(c *gin.Context) { handle.ApiUserUpdateAvatar(c, s) })
 			protected.POST("/update/logout", func(c *gin.Context) { handle.ApiUserLogout(c, s) })
-
 			protected.GET("/posts/:id/contactinfo", func(c *gin.Context) { handle.ApiPostContactInfo(c, s) })
 
 			// 新增：发评论、删评论、上传图片，都需要 Token
 			protected.POST("/update/comments", func(c *gin.Context) { handle.ApiCreateComment(c, s) })
 			protected.DELETE("/update/comments/:id", func(c *gin.Context) { handle.ApiDeleteComment(c, s) })
 			protected.POST("/update/upload", func(c *gin.Context) { handle.ApiUploadImage(c) })
+
+			protected.GET("users/me", func(c *gin.Context) { handle.ApiGetMeInfo(c, s) })
 		}
 	}
 
