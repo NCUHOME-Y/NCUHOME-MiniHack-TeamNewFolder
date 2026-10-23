@@ -1,6 +1,7 @@
 package handle
 
 import (
+	"Backend/Tags"
 	"Backend/auth"
 	"Backend/storage"
 	"Backend/trans"
@@ -221,19 +222,25 @@ func ApiUserCreatePost(c *gin.Context, s *storage.Store) {
 		}
 	}
 
+	normalized, err := Tags.NormTag(c.Request.Context(), s.DB, req.Tags)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "标签不合法"})
+		return
+	}
+
 	post := storage.Post{
 		UserID:      userID,
 		Type:        req.Type,
 		Title:       req.Title,
 		Description: req.Description,
 		ImageURL:    cover,
-		Tags:        req.Tags,
+		Tags:        normalized,
 		Location:    req.Location,
 		ContactInfo: req.ContactInfo,
 		Status:      0,
 	}
 
-	err := s.UserCreatePost(c.Request.Context(), &post)
+	err = s.UserCreatePost(c.Request.Context(), &post)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "发布失败，请稍后重试"})
 		return

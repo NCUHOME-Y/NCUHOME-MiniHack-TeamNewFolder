@@ -1,6 +1,8 @@
 package main
 
 import (
+	"Backend/Search"
+	"Backend/Tags"
 	"Backend/auth"
 	"Backend/handle"
 	"Backend/storage"
@@ -117,6 +119,8 @@ func main() {
 			protected.GET("users/me", func(c *gin.Context) { handle.ApiGetMeInfo(c, s) })
 		}
 	}
+	Tags.RegRoutes(api, db)
+	Search.RegRoutes(api, db)
 
 	srv := &http.Server{
 		Addr:    addr,

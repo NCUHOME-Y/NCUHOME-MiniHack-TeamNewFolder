@@ -172,7 +172,6 @@ func (s *Store) DeleteToken(rawToken string) error {
 
 // 加了ctx
 func (s *Store) UserCreatePost(ctx context.Context, p *Post) error {
-	//err := s.DB.Create(&p).Error
 	err := s.DB.WithContext(ctx).Create(&p).Error
 	if err != nil {
 		return err
