@@ -55,4 +55,40 @@ type CreatePost struct {
 	Tags        string `json:"tags" binding:"omitempty,max=255"`
 	Location    string `json:"location" binding:"required,max=255"`
 	ContactInfo string `json:"contact_info" binding:"required,max=100"`
+	// 多图,原来的 image_url 继续当封面用，这个数组存完整图集
+	ImageURLs []string `json:"image_urls" binding:"omitempty,max=9,dive,max=500"`
+}
+
+// 发表评论的请求体
+type CreateCommentReq struct {
+	PostID uint64 `json:"post_id" binding:"required"` // 评论挂在哪个帖子下
+
+	Content string `json:"content" binding:"required,max=2000"`
+
+	// 引用第几楼。用指针是为了区分「没传」（nil）和「传了 0」
+	ReplyTo *uint32 `json:"reply_to"`
+
+	//max=9 限制最多 9 张，dive,max=500 限制每个地址不超过 500 字符
+	ImageURLs []string `json:"image_urls" binding:"omitempty,max=9,dive,max=500"`
+}
+
+// 评论列表返回的一条
+type CommentListItem struct {
+	ID        uint64    `json:"id"`
+	Floor     uint32    `json:"floor"`
+	ReplyTo   *uint32   `json:"reply_to"`
+	Content   string    `json:"content"`
+	ImageURL  string    `json:"image_url"`
+	CreatedAt time.Time `json:"created_at"`
+
+	//评论作者
+	UserID    uint64 `json:"user_id"`
+	Username  string `json:"username"`
+	AvatarURL string `json:"avatar_url"`
+}
+
+// 评论列表的分页参数。和 PostListReq 一样用 form 标签
+type CommentListReq struct {
+	Page     int `json:"page" form:"page,default=1" binding:"min=1"`
+	PageSize int `json:"page_size" form:"page_size,default=20" binding:"min=1,max=50"`
 }

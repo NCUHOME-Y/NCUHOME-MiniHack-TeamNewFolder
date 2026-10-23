@@ -202,12 +202,30 @@ func ApiUserCreatePost(c *gin.Context, s *storage.Store) {
 		return
 	}
 
+	// 封面图：优先用 image_url，没传就用 image_urls 里的第一张
+	cover := req.ImageURL
+	if cover == "" && len(req.ImageURLs) > 0 {
+		cover = req.ImageURLs[0]
+	}
+	// 校验地址合法性：只接受 http(s) 绝对地址或站内绝对路径（如 /uploads/...），
+	// 挡住 javascript:、data: 这类会被前端渲染执行的协议（存储型 XSS）
+	if cover != "" && !isSafeURL(cover) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "图片地址不合法"})
+		return
+	}
+	for _, u := range req.ImageURLs {
+		if !isSafeURL(u) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "图片地址不合法"})
+			return
+		}
+	}
+
 	post := storage.Post{
 		UserID:      userID,
 		Type:        req.Type,
 		Title:       req.Title,
 		Description: req.Description,
-		ImageURL:    req.ImageURL,
+		ImageURL:    cover,
 		Tags:        req.Tags,
 		Location:    req.Location,
 		ContactInfo: req.ContactInfo,
@@ -219,6 +237,14 @@ func ApiUserCreatePost(c *gin.Context, s *storage.Store) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "发布失败，请稍后重试"})
 		return
 	}
+
+	// 多图写进 post_images。失败只记日志：帖子本身已经创建成功，不该因此回滚
+	if len(req.ImageURLs) > 0 {
+		if err := s.AddImages(c.Request.Context(), storage.TargetTypePost, post.ID, req.ImageURLs); err != nil {
+			log.Printf("add post images failed: %v", err)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "发布成功", "post_id": post.ID})
 }
 
