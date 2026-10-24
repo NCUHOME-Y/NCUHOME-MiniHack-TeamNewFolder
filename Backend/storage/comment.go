@@ -11,6 +11,11 @@ import (
 var (
 	ErrPostNotFound    = errors.New("帖子不存在")
 	ErrCommentNotFound = errors.New("评论不存在")
+	// ErrPostClosed 【P0 修复】新增：帖子已结帖。
+	// 以前 GetPostDetail 把「不存在」和「已结帖」都返回成普通 error，
+	// handler 分不清是客户端问题还是服务端问题，一律返回 500。
+	// 现在用哨兵错误，handler 才能分别映射成 404 / 403。
+	ErrPostClosed = errors.New("帖子已结帖")
 )
 
 // CreateComment 发表评论，返回带楼层号的评论对象

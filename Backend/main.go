@@ -77,6 +77,21 @@ func main() {
 	sqldb.SetConnMaxLifetime(30 * time.Minute)
 
 	s := storage.NewStore(db)
+
+	// 【P0 修复】初始化标签库 —— 这一步以前漏了。
+	// 不调用的话 tags 表一直是空的：GET /api/tags 返回 []，
+	// 前端的标签云和发布页的标签选择器都渲染不出任何标签，
+	// 而发布页又要求"必须先选标签"才能提交 → 整个发帖功能不可用。
+	// InitTagLibr 内部是 FirstOrCreate，重复执行不会产生重复数据。
+	if err := Tags.InitTagLibr(context.Background(), db); err != nil {
+		// 这里不直接退出：登录、帖子列表等接口仍然可用，便于先把其它功能跑通。
+		// 但发帖一定会失败，所以必须把原因和解决办法明确打出来，不能静默。
+		log.Printf("⚠ 标签库初始化失败: %v", err)
+		log.Printf("   请先在数据库里执行 Backend/migrations/schema.sql（至少要有 tags 表），否则无法发帖")
+	} else {
+		log.Printf("标签库初始化完成，共 %d 个默认标签", len(Tags.DefTags))
+	}
+
 	r := gin.Default()
 
 	// 中间件必须在注册任何路由之前调用。
