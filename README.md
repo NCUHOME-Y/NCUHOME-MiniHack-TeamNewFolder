@@ -1,5 +1,4 @@
 # NCUHOME-MiniHack-TeamNewFolder
-
 //user建表信息
 +---------------+-----------------+------+-----+-------------------+-------------------+
 | Field         | Type            | Null | Key | Default           | Extra             |
@@ -12,7 +11,6 @@
 | bio           | text            | YES  |     | NULL              |                   |
 | creat_at      | datetime        | NO   |     | CURRENT_TIMESTAMP | DEFAULT_GENERATED |
 +---------------+-----------------+------+-----+-------------------+-------------------+
-
 //user_tokens建表信息
 +------------+-----------------+------+-----+-------------------+-------------------+
 | Field      | Type            | Null | Key | Default           | Extra             |
@@ -24,7 +22,6 @@
 | revoked    | tinyint         | NO   |     | 0                 |                   |
 | created_at | timestamp       | NO   |     | CURRENT_TIMESTAMP | DEFAULT_GENERATED |
 +------------+-----------------+------+-----+-------------------+-------------------+
-
 //posts建表信息
 +--------------+-----------------+------+-----+-------------------+-----------------------------------------------+
 | Field        | Type            | Null | Key | Default           | Extra                                         |
@@ -42,7 +39,6 @@
 | created_at   | timestamp       | NO   | MUL | CURRENT_TIMESTAMP | DEFAULT_GENERATED                             |
 | updated_at   | timestamp       | NO   |     | CURRENT_TIMESTAMP | DEFAULT_GENERATED on update CURRENT_TIMESTAMP |
 +--------------+-----------------+------+-----+-------------------+-----------------------------------------------+
-
 //comment建表数据
 -- 评论表：每条评论属于一个帖子，floor 是楼层号
 CREATE TABLE comments (
@@ -58,7 +54,6 @@ CREATE TABLE comments (
   INDEX idx_post_floor (post_id, floor),
   INDEX idx_user (user_id)
 );
-
 -- 图片表：帖子和评论共用，靠 target_type 区分
 CREATE TABLE post_images (
   id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -69,6 +64,5 @@ CREATE TABLE post_images (
   created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_target (target_type, target_id)
 );
-
 -- 给帖子加一个评论数（冗余字段，列表页直接显示，不用每次 COUNT）
 ALTER TABLE posts ADD COLUMN comment_count INT UNSIGNED NOT NULL DEFAULT 0;

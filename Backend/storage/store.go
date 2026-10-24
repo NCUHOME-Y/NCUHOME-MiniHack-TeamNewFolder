@@ -27,8 +27,8 @@ func NewStore(db *gorm.DB) *Store {
 
 func (s *Store) CreateUser(ctx context.Context, username, password, bio string) (*User, error) {
 
-	if len(password) > 72 {
-		return nil, fmt.Errorf("密码过长")
+	if len([]byte(password)) > 72 {
+		return nil, errors.New("密码过长")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
@@ -172,7 +172,6 @@ func (s *Store) DeleteToken(rawToken string) error {
 
 // 加了ctx
 func (s *Store) UserCreatePost(ctx context.Context, p *Post) error {
-	//err := s.DB.Create(&p).Error
 	err := s.DB.WithContext(ctx).Create(&p).Error
 	if err != nil {
 		return err
@@ -241,4 +240,16 @@ func (s *Store) GetPostList(ctx context.Context, postType int8, status int8, off
 		list = append(list, item)
 	}
 	return list, tol, nil
+}
+
+func (s *Store) GetPostDetail(postID uint64) (*Post, error) {
+	var post Post
+	err := s.DB.Table("posts").Where("id = ?", postID).First(&post).Error
+	if err != nil {
+		return nil, errors.New("帖子不存在")
+	}
+	if post.Status != 0 {
+		return nil, errors.New("帖子已截")
+	}
+	return &post, nil
 }

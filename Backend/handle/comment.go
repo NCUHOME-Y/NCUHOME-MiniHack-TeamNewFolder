@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -50,6 +51,12 @@ func ApiCreateComment(c *gin.Context, s *storage.Store) {
 		return
 	}
 
+	content := strings.TrimSpace(req.Content)
+	if content == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "评论内容不能为空"})
+		return
+	}
+
 	// 逐张校验图片地址：只接受 http(s) 绝对地址或站内绝对路径（如 /uploads/...），
 	// 挡住 javascript:、data: 这类会被前端渲染执行的协议（存储型 XSS）
 	for _, u := range req.ImageURLs {
@@ -67,30 +74,31 @@ func ApiCreateComment(c *gin.Context, s *storage.Store) {
 	}
 
 	cm, err := s.CreateComment(c.Request.Context(), req.PostID, userID, req.Content, cover, req.ReplyTo)
-		if err != nil {
-			// 帖子不存在是客户端的问题，返回 404
-			if errors.Is(err, storage.ErrPostNotFound) {
-				c.JSON(http.StatusNotFound, gin.H{"error": "帖子不存在"})
-				return 
-			}
-			// 错误详情只写日志，不回显给客户端
-			log.Printf("create comment failed: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "评论失败，稍后再试"})
+	if err != nil {
+		// 帖子不存在是客户端的问题，返回 404
+		if errors.Is(err, storage.ErrPostNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "帖子不存在"})
 			return
 		}
+		// 错误详情只写日志，不回显给客户端
+		log.Printf("create comment failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "评论失败，稍后再试"})
+		return
+	}
 	// 评论本身已经发出去了，只是图片没挂上，记日志即可，不回滚评论
 	if len(req.ImageURLs) > 0 {
-		if err := s.AddImages(c.Request.Context(), storage.TargetTypeComment, cm.ID, req.ImageURLs); err != nil{
+		if err := s.AddImages(c.Request.Context(), storage.TargetTypeComment, cm.ID, req.ImageURLs); err != nil {
 			log.Printf("add comment images failed: %v", err)
 		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "评论成功",
+		"message":    "评论成功",
 		"comment_id": cm.ID,
-		"floor": cm.Floor,
+		"floor":      cm.Floor,
 	})
 }
+
 // ApiGetCommentList  GET /api/posts/:id/comments
 // 公开接口，不需要登录（和 GET /api/posts 一样）
 func ApiGetCommentList(c *gin.Context, s *storage.Store) {
