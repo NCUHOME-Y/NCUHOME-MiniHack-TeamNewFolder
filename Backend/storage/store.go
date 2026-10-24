@@ -242,14 +242,25 @@ func (s *Store) GetPostList(ctx context.Context, postType int8, status int8, off
 	return list, tol, nil
 }
 
-func (s *Store) GetPostDetail(postID uint64) (*Post, error) {
+// GetPostDetail 按 ID 查帖子详情，给「获取联系方式」接口用。
+//
+// 【P0 修复】
+//  1. 补上 ctx：客户端断开后这条 SQL 能被取消，不再白白占用连接。
+//  2. 错误改成哨兵错误：查不到返回 ErrPostNotFound、已结帖返回 ErrPostClosed。
+//     原来两种情况都返回 errors.New("帖子不存在")/("帖子已截")，
+//     handler 只能一律当成服务端故障返回 500，前端看不出是"帖子没了"。
+func (s *Store) GetPostDetail(ctx context.Context, postID uint64) (*Post, error) {
 	var post Post
-	err := s.DB.Table("posts").Where("id = ?", postID).First(&post).Error
+	err := s.DB.WithContext(ctx).Table("posts").Where("id = ?", postID).First(&post).Error
 	if err != nil {
-		return nil, errors.New("帖子不存在")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPostNotFound
+		}
+		// 数据库层面的真实错误原样往上抛，由 handler 记日志 + 返回 500
+		return nil, err
 	}
 	if post.Status != 0 {
-		return nil, errors.New("帖子已截")
+		return nil, ErrPostClosed
 	}
 	return &post, nil
 }

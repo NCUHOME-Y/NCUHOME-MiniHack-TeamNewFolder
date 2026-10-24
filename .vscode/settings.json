@@ -1,3 +1,17 @@
 {
-    "liveServer.settings.port": 5520
+    "liveServer.settings.port": 5520,
+    // 上传图片时后端会往 Backend/uploads/ 写新文件，
+    // Live Server 监听到工作区文件变化就会整页重载页面，
+    // 导致发布页里刚上传的图片（只存在前端内存里）被刷掉。
+    // 把后端目录和图片文件排除掉，上传就不会再触发自动刷新。
+    "liveServer.settings.ignoreFiles": [
+        ".vscode/**",
+        "Backend/**",
+        "**/uploads/**",
+        "**/*.jpg",
+        "**/*.jpeg",
+        "**/*.png",
+        "**/*.gif",
+        "**/*.webp"
+    ]
 }

@@ -29,6 +29,48 @@ function cachePosts(list) {
   (list || []).forEach(p => { if (p && p.id != null) store.postsById[p.id] = p; });
 }
 
+/* ---------- 发帖草稿（存 localStorage，刷新/重渲染都不丢） ---------- */
+// 【修复：上传图片后被刷新丢失】
+// 根因：已上传图片的 url 只存在 store.uploads 这个内存变量里。
+// 只要页面被整页重载（Live Server 监听到新文件自动刷新、手动按 F5、手机端切后台回来），
+// 内存变量就清空了 —— 但图片文件其实还在服务器 Backend/uploads/ 下面，只是前端"忘了"它的地址。
+// 所以这里把草稿（已上传的 url + 已填的文字 + 选中的标签）同步到 localStorage，
+// 进入发布页时再读回来，效果等于"刷新后继续编辑"。
+const DRAFT_KEY = 'postDraft';
+
+function saveDraft() {
+  const val = id => {
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+  };
+  const draft = {
+    postType: store.postType,
+    postTag: store.postTag,
+    uploads: store.uploads,
+    title: val('p-title'),
+    desc: val('p-desc'),
+    loc: val('p-loc'),
+    contact: val('p-contact'),
+  };
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch (e) {
+    // 无痕模式、localStorage 写满等情况下会抛异常；草稿存不下不该影响正常发帖
+  }
+}
+
+function loadDraft() {
+  try {
+    return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+}
+
 try {
   store.user = JSON.parse(localStorage.getItem('user') || 'null');
 } catch (e) {
@@ -385,6 +427,15 @@ async function doSearch() {
 
 /* ---------- 发帖 ---------- */
 function renderPostForm() {
+  // 【修复】进页面先把上次的草稿读回来。
+  // 必须在拼 innerHTML 之前读：下面「我要寻物/我捡到了」的高亮状态依赖 store.postType。
+  const draft = loadDraft();
+  if (draft) {
+    if (draft.postType === 'lost' || draft.postType === 'found') store.postType = draft.postType;
+    store.postTag = draft.postTag || null;
+    store.uploads = Array.isArray(draft.uploads) ? draft.uploads : [];
+  }
+
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="page-head"><h1>发布帖子</h1><p>如实描述，方便失主/拾到者核对</p></div>
@@ -424,8 +475,35 @@ function renderPostForm() {
       </div>
       <button class="btn-primary" id="submit-post">发布</button>
     </div>`;
-  document.getElementById('p-title').addEventListener('input', e => document.getElementById('title-count').textContent = e.target.value.length);
-  document.getElementById('p-desc').addEventListener('input', e => document.getElementById('desc-count').textContent = e.target.value.length);
+
+  // 【修复】把草稿里已经填过的文字回填到输入框
+  if (draft) {
+    const fill = (id, v) => {
+      const el = document.getElementById(id);
+      if (el && v) el.value = v;
+    };
+    fill('p-title', draft.title);
+    fill('p-desc', draft.desc);
+    fill('p-loc', draft.loc);
+    fill('p-contact', draft.contact);
+  }
+
+  document.getElementById('p-title').addEventListener('input', e => {
+    document.getElementById('title-count').textContent = e.target.value.length;
+    saveDraft();   // 【修复】边填边存，刷新后内容不丢
+  });
+  document.getElementById('p-desc').addEventListener('input', e => {
+    document.getElementById('desc-count').textContent = e.target.value.length;
+    saveDraft();
+  });
+  // 地点、联系方式没有字数统计，直接绑保存即可
+  document.getElementById('p-loc').addEventListener('input', saveDraft);
+  document.getElementById('p-contact').addEventListener('input', saveDraft);
+
+  // 回填后同步一次字数统计，否则会显示 0/100 但输入框里其实有内容
+  document.getElementById('title-count').textContent = document.getElementById('p-title').value.length;
+  document.getElementById('desc-count').textContent = document.getElementById('p-desc').value.length;
+
   document.getElementById('submit-post').onclick = submitPost;
   document.getElementById('file-input').addEventListener('change', onFilePick);
   loadTagPicker();
@@ -439,8 +517,10 @@ async function loadTagPicker() {
     ).join('');
   } catch (e) {}
 }
-function setPostType(t) { store.postType = t; renderPostForm(); }
-function setPostTag(t) { store.postTag = t; renderPostForm(); }
+// 【修复】改类型/标签会整块重渲染表单，所以先把当前状态写进草稿再重渲染，
+// 否则 renderPostForm 里读回来的还是旧草稿，刚点的标签会被覆盖掉。
+function setPostType(t) { store.postType = t; saveDraft(); renderPostForm(); }
+function setPostTag(t) { store.postTag = t; saveDraft(); renderPostForm(); }
 function pickImage() { document.getElementById('file-input').click(); }
 function renderUploads() {
   const grid = document.getElementById('upload-grid');
@@ -450,7 +530,11 @@ function renderUploads() {
   ).join('') + `
     <div class="upload-box" onclick="pickImage()"><span style="font-size:24px">＋</span><span>上传图片</span></div>`;
 }
-function removeUpload(i) { store.uploads.splice(i, 1); renderUploads(); }
+function removeUpload(i) {
+  store.uploads.splice(i, 1);
+  renderUploads();
+  saveDraft();   // 【修复】删掉一张图也要同步草稿，否则刷新后它又冒出来
+}
 async function onFilePick(e) {
   const files = Array.from(e.target.files || []);
   if (store.uploads.length + files.length > 9) { toast('最多 9 张'); return; }
@@ -460,6 +544,9 @@ async function onFilePick(e) {
       const url = await apiUpload(f);
       store.uploads.push(url);
       renderUploads();
+      // 【修复】上传成功立刻把 url 写进草稿。
+      // 这是关键一行：即便下一秒页面被整页刷新，图片地址也还在 localStorage 里，刷新后能恢复显示。
+      saveDraft();
     } catch (err) {
       toast(err.message);
     }
@@ -484,6 +571,7 @@ async function submitPost() {
     store.postTag = null;
     store.uploads = [];
     store.filter = 'all';
+    clearDraft();   // 【修复】发布成功后清空草稿，下次进发布页是干净的空表单
     toast('发布成功');
     location.hash = '#/home';
     render();

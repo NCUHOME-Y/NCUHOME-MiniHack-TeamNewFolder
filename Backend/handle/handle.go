@@ -302,16 +302,35 @@ func ApiGetPostList(c *gin.Context, s *storage.Store) {
 	})
 }
 
+// ApiPostContactInfo  GET /api/posts/:id/contactinfo （需登录）
+// 返回某个帖子的联系方式。联系方式在列表里故意不返回，只在详情里给，
+// 所以这个接口是「给失主/拾到者留联系方式」的唯一出口。
 func ApiPostContactInfo(c *gin.Context, s *storage.Store) {
-	var req trans.PostDetailReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "参数错误：" + err.Error()})
+	// 【P0 修复】帖子 ID 从 URL 路径参数里取，不再从请求体读。
+	// 原来写的是 ShouldBindJSON(&req) + trans.PostDetailReq，但这里路由是 GET：
+	//   - 浏览器 fetch 无法给 GET 请求带 body（前端 README 里也是这么记的）
+	//   - JSON 解码器读到空流立刻返回 EOF，于是这个接口 100% 返回 400
+	// 也就是说「获取联系方式」这条路一直是断的，详情页只能显示"请到留言区联系"。
+	// parseID 是 handle/comment.go:31 里现成的工具函数，和评论接口共用同一套解析逻辑。
+	postID, ok := parseID(c, "id")
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "帖子 ID 不合法"})
 		return
 	}
 
-	query, err := s.GetPostDetail(req.ID)
+	query, err := s.GetPostDetail(c.Request.Context(), postID)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "获取列表详细信息失败，请稍后重试"})
+		// 区分「客户端问题」和「服务端问题」，不再一股脑 500
+		switch {
+		case errors.Is(err, storage.ErrPostNotFound):
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "帖子不存在"})
+		case errors.Is(err, storage.ErrPostClosed):
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "帖子已结帖，联系方式不可见"})
+		default:
+			// 真实错误只写日志，不回显给客户端（响应里带 SQL 错误会泄露表结构）
+			log.Printf("get post detail failed: %v", err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "获取帖子详情失败，请稍后重试"})
+		}
 		return
 	}
 

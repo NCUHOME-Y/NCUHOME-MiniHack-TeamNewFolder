@@ -16,7 +16,9 @@ import (
 
 // 标签相关常量
 const (
-	// DefTagName先写了个Test进去
+	// DefTagName 早期用来占位的测试标签。
+	// 【P0 修复后已不再写入标签库】保留这个常量只是为了不破坏外部可能的引用，
+	// 真正初始化标签库用的是下面的 DefTags 列表。
 	DefTagName = "TEST"
 	// TagSep posts.tags 列中多个标签的分隔符（逗号分隔纯文本）
 	// ⚠ 被 Tags 包内 3 处 + Search 包 2 处引用，删掉就编译不过
@@ -24,6 +26,18 @@ const (
 	// MaxTagLength 单个标签名的最大字符数
 	MaxTagLength = 32
 )
+
+// DefTags 默认标签库。
+// 【P0 修复】这些名字必须和前端 Frontend/app.js 里的 TAG_EMOJI 的 key 完全一致，
+// 否则用户在页面上选到的标签在标签库里查不到，
+// 走标签搜索时会直接被 SearchPosts 判成 404（标签不存在）。
+var DefTags = []string{
+	"校园卡", "身份证证件", "钥匙", "耳机",
+	"手机数码", "充电宝", "雨伞", "水杯",
+	"书籍笔记", "眼镜", "钱包", "书包",
+	"笔袋文具", "手表首饰", "衣物外套",
+	"篮球器材", "球拍", "化妆品",
+}
 
 // ai帮写的错误处理
 // 我恨你
@@ -45,11 +59,20 @@ func (Tag) TableName() string {
 	return "tags"
 }
 
-// InitTagLibr 初始化基准标签库，写入 TEST
-// TEST存在，不会重复创建，在main.go建立数据库连接后立刻调用一次
+// InitTagLibr 初始化基准标签库：把 DefTags 里的标签全部写进去。
+// CreateTag 内部是 FirstOrCreate，已存在的标签不会重复创建，可以反复调用。
+//
+// 【P0 修复】这个方法原来全项目零调用，导致 tags 表永远是空的：
+//   - GET /api/tags 返回空数组 → 前端标签云 / 标签选择器一片空白
+//   - 而发布页又强制「必须先选标签」才能提交 → 发帖功能完全不可用
+//   - 标签只在发帖时由 NormTag 自动创建，于是形成死锁：发帖要先有标签，标签要靠发帖产生
+//
+// 现在由 main.go 在连上数据库后立刻调用一次（见 main.go 里的 Tags.InitTagLibr）。
 func InitTagLibr(ctx context.Context, db *gorm.DB) error {
-	if _, err := CreateTag(ctx, db, DefTagName); err != nil {
-		return fmt.Errorf("初始化标签库失败：%w", err)
+	for _, name := range DefTags {
+		if _, err := CreateTag(ctx, db, name); err != nil {
+			return fmt.Errorf("初始化标签库失败（%s）：%w", name, err)
+		}
 	}
 	return nil
 }
